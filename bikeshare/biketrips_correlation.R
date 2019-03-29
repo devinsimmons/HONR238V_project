@@ -67,15 +67,19 @@ colnames(avg_daily_temp) <- c('day', 'temp_f')
 wind_vs_trips <- inner_join(june_hourly_trips, windSpeed_NYC, by = c('Hour' = 'Date'))
 #join trips by day to temperature by day
 temp_vs_trips <- inner_join(june_daily_trips, avg_daily_temp, by = c('day' = 'day'))
-View(temp_vs_trips)
+
 
 #linear regression statistics for temp vs trips
 lin_reg_temp <- lm(trips_taken ~ temp_f, data = temp_vs_trips)
+#manually looking at values from here to determine the regression eq
 summary(lin_reg_temp)
 
 
+#plotting data
 ggplot(data = wind_vs_trips, aes(x = wind_vs_trips$`Wind Speed (mph)`, y = wind_vs_trips$trips_taken)) + geom_point(color = 'blue') + labs(x = 'Hourly Wind Speed', y = 'Trips taken in an hour', title = 'June 2015 Citibike Trips Compared to Wind Speed') + stat_smooth(method = "lm", col = 'black')
+
 
 temp_corr <- ggplot(data = temp_vs_trips, aes(x = temp_vs_trips$temp_f, y = temp_vs_trips$trips_taken)) + geom_point(color = 'blue') + labs(x = 'Mean daily temperature, degrees Fahrenheit', y = 'Trips taken in a day', title = 'June 2015 Citibike Daily Ridership Compared to Temperature') + stat_smooth(method = "lm", col = 'black') + annotate("text", x = 60, y = 10000, label = "y = 315X + 8612.2, R2 = 0.0201")
 
+#save plot
 ggsave(filename="temp_and_bike_ridership.png", plot=temp_corr)
