@@ -34,4 +34,4 @@ temp_vs_rides <- inner_join(daily_rides, avg_daily_temp, by = c('day' = 'day'))
 lin_reg_temp <- lm(rides ~ temp_F, data = temp_vs_rides)
 summary(lin_reg_temp)
 
-ggplot(data = temp_vs_rides, aes(x = temp_vs_rides$temp_F, y = temp_vs_rides$rides)) + geom_point(color = 'blue') + labs(x = 'Average Daily Temperature (degrees Fahrenheit)', y = 'Rides Taken in a Day', title = 'Jan. 2, 2015-June 1, 2015 Uber Daily Ridership in New York City vs. Average Daily Temperature')
+ggplot(data = temp_vs_rides, aes(x = temp_vs_rides$temp_F, y = temp_vs_rides$rides)) + geom_point(color = 'blue') + labs(x = 'Average Daily Temperature (degrees Fahrenheit)', y = 'Rides Taken in a Day', title = 'Uber Daily Ridership vs. Average Daily Temperature') + stat_smooth(method = "lm", col = 'black') + annotate("text", x = 55, y = 25000, label = "y = 158.28X + 69240.79, R2 = 0.0255")
