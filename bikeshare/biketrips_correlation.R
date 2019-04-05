@@ -1,8 +1,7 @@
 library(dplyr)
+library(tidyr)
 library(ggplot2)
 library(lubridate)
-install.packages('rockchalk')
-library(forcats)
 
 setwd("C:/Users/Devin Simmons/Desktop/classes/HONR238V/data/")
 
@@ -29,6 +28,9 @@ trips_2015$day <- format(as.Date(trips_2015$starttime, format='%m-%d-%Y %H:%M'),
 trips_2015$hour <- round_date(ymd_hms(trips_2015$starttime), 'hour')
 #convert back to POSIXct so dplyr can work with it
 trips_2015$hour <- as.POSIXct(trips_2015$hour)
+#extract just the hour, which is stored as an integer
+trips_2015$time_of_day <- hour(trips_2015$hour)
+
 
 #group trips by hour so it can be compared with hourly weather measurements
 hourly_trips <- trips_2015 %>% group_by(trips_2015$hour) %>% summarize(n())
@@ -91,11 +93,17 @@ weather_desc$description <- combineLevels(weather_desc$description, levs = c('mo
 weather_desc$description <- combineLevels(weather_desc$description, levs = c('light snow', 'snow', 'heavy snow'), newLabel = c('Snow'))
 #fog, smoke, etc
 weather_desc$description <- combineLevels(weather_desc$description, levs = c('mist', 'fog', 'smoke', 'haze'), newLabel= c('Fog/Haze/Smoke'))
+#detach rockchalk because it messes w/ the dplyr summarize function
+detach("package:rockchalk", unload=TRUE)
 
 
 #determines the average temperature for each day
 avg_daily_temp <- temperature %>% group_by(temperature$Date) %>% summarize(mean_daily_temp = mean(deg_fahrenheit))
 colnames(avg_daily_temp) <- c('day', 'temp_f')
+#daily pattern of ridership. uses the daily_rides df to determine the number of days
+daily_pattern <- trips_2015 %>% group_by(trips_2015$time) %>% summarize(n()/(nrow(daily_trips)))
+colnames(daily_pattern) <- c('hour', 'mean_ridership')
+
 
 #join trips by hour to windspeed by hour based on time of observation
 wind_vs_trips <- inner_join(hourly_trips, windSpeed, by = c('Hour' = 'Date'))
@@ -109,22 +117,72 @@ desc_vs_trips <- inner_join(hourly_trips, weather_desc, by = c('Hour' = 'Date'))
 weather_trips <- desc_vs_trips %>% group_by(desc_vs_trips$description) %>% summarise(trips = mean(trips_taken), stdev = sd(trips_taken))
 colnames(weather_trips) <- c('desc', 'trips', 'stdev')
 
+
 #linear regression statistics for temp vs trips
 lin_reg_temp <- lm(trips_taken ~ temp_f, data = temp_vs_trips)
 #manually looking at values from here to determine the regression eq
 summary(lin_reg_temp)
 
 
-#plotting data
+#plotting correlations between ridership and windspeed, temperature
 wind_corr <- ggplot(data = wind_vs_trips, aes(x = wind_vs_trips$wind_speed_mph, y = wind_vs_trips$trips_taken)) + geom_point(color = 'blue') + labs(x = 'Hourly Wind Speed', y = 'Trips taken in an hour', title = 'Jan. - Jun. 2015 Citibike Trips Compared to Wind Speed') + stat_smooth(method = "lm", col = 'black')
-
 
 temp_corr <- ggplot(data = temp_vs_trips, aes(x = temp_vs_trips$temp_f, y = temp_vs_trips$trips_taken)) + geom_point(color = 'blue') + labs(x = 'Mean daily temperature, degrees Fahrenheit', y = 'Trips taken in a day', title = 'Jan. - Jun. 2015 Citibike Daily Ridership Compared to Temperature') + stat_smooth(method = "lm", col = 'black') + annotate("text", x = 60, y = 10000, label = "y = 473x - 2319, R2 = 0.75")
 
-#plot bar graph
-weather_plot <- ggplot(data = weather_trips, aes(x = desc, y = trips))+ geom_bar(stat = 'identity') + labs(x = 'Weather conditions in a given hour', y = 'Average number of hourly trips taken', title = 'Jan. - Jun. 2015 Citibike Average Hourly Ridership in Different Weather Conditions')
-weather_plot
+#plot bar graph of weather conditions, hourly ridership
+weather_boxplot <- ggplot(data = desc_vs_trips, aes(x = description, y = trips_taken))+ 
+                  geom_boxplot(width = 0.5, 
+                               fill = 'steelblue', 
+                               outlier.color = 'navyblue', 
+                               notch = TRUE, 
+                               position = 'dodge') + 
+                  labs(x = 'Weather conditions in a given hour', 
+                       y = 'Average number of hourly trips taken', 
+                       title = 'Jan. - Jun. 2015 Citibike Average Hourly Ridership in Different Weather Conditions')
 
+weather_barplot <- ggplot(data = 
+                            weather_trips, 
+                          aes(x = desc, 
+                              y = trips))+ 
+                    geom_bar(stat = 'identity',
+                             width = 0.5, 
+                             fill = 'steelblue') + 
+                    labs(x = 'Weather conditions in a given hour', 
+                         y = 'Average number of hourly trips taken', 
+                         title = 'Jan. - Jun. 2015 Citibike Average Hourly Ridership in Different Weather Conditions')
 
+daily_ridership_pattern <- ggplot(data = daily_pattern, aes(x = hour, 
+                                                            y = mean_ridership)) +
+                            geom_line(linetype = 'solid',
+                                     col = 'springgreen3') +
+                            geom_point(col = 'springgreen4') +
+                            labs(x = 'Hour of the day',
+                                 y = 'Mean Ridership',
+                                 title = 'Citibike Daily Ridership Pattern')
+
+#histograms showing the distribution of daily, hourly ridership
+hist_daily <- ggplot(data = temp_vs_trips, aes(temp_vs_trips$trips_taken)) + geom_histogram(col = 'white',
+                                                                              fill = 'slateblue4',
+                                                                              binwidth = 2500) + 
+                                                              geom_density(aes (y = (2500 * ..count..))) + 
+                                                              labs(x = 'Daily Ridership', 
+                                                                   y = 'Frequency', 
+                                                                   title = 'Histogram of Daily Ridership from Jan.-Jun. 2015')
+
+hist_hourly <- ggplot(data = desc_vs_trips, aes(desc_vs_trips$trips_taken)) + geom_histogram(fill = 'slateblue4',
+                                                                              col = 'white',
+                                                                              binwidth = 150)  + 
+                                                                geom_density(aes(y = (150*..count..))) + 
+                                                                labs(x = 'Hourly Ridership', 
+                                                                     y = 'Frequency', 
+                                                                     title = 'Histogram of Hourly Ridership from Jan.-Jun. 2015')
+hist_hourly
+
+setwd("C:/Users/Devin Simmons/Desktop/classes/HONR238V/figures/")
 #save plot
 ggsave(filename="temp_and_bike_ridership.png", plot=temp_corr)
+ggsave(filename = 'weather_conditions_ridership.png', plot = weather_barplot)
+ggsave(filename = 'weather_conditions_box.png', plot = weather_boxplot)
+ggsave(filename = 'wind_ridership.png', plot = wind_corr)
+ggsave(filename = 'daily_ridership.png', plot = hist_daily)
+ggsave(filename = 'hourly_ridership.png', plot = hist_hourly)
