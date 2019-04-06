@@ -41,4 +41,5 @@ weather_vs_rides <- inner_join(hourly_rides, weatherDescription_NYC, by = c('hou
 weather_rides <- weather_vs_rides %>% group_by(weather_vs_rides$description) %>% summarise(trips = mean(rides), stdev = sd(rides))
 colnames(weather_rides) <- c('desc', 'rides', 'stdev')
 
-ggplot(data = weather_rides, aes(x = desc, y = rides))+ geom_bar(stat = 'identity') + labs(x = 'weather conditions in a given hour', y = 'average number of hourly trips taken', title = 'Uber Hourly Ridership in Different Weather Conditions')
+ggplot(data = weather_rides, aes(x = desc, y = rides)) + geom_bar(stat = 'identity') + labs(x = 'Weather Conditions in a Given Hour', y = 'Average Number of Hourly Trips Taken', title = 'Uber Hourly Ridership in Different Weather Conditions')
+# ggplot(data = weather_rides, aes(x = desc, y = rides)) + geom_boxplot(width = 0.5, fill = 'steelblue', outlier.color = 'navyblue', notch = TRUE, position = 'dodge') + labs(x = 'Weather conditions in a given hour', y = 'average number of hourly trips taken', title = 'Uber Hourly Ridership in Different Weather Conditions')
