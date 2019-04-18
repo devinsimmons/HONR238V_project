@@ -84,37 +84,68 @@ levels(weather_desc$description) <- c(levels(weather_desc$description), 'Clear o
 library(rockchalk)
 #use rockchalk to group levels
 #no rain, either clear or cloudy
-weather_desc$description <-combineLevels(weather_desc$description, levs = c('sky is clear', 'few clouds', 'broken clouds', 'overcast clouds', 'scattered clouds'), newLabel = c('Clear or cloudy'))
+weather_desc$description <-combineLevels(weather_desc$description, 
+                                         levs = c('sky is clear', 'few clouds', 'broken clouds', 'overcast clouds', 'scattered clouds'), 
+                                         newLabel = c('Clear or cloudy'))
 #light rain
-weather_desc$description <- combineLevels(weather_desc$description, levs = c('light intensity drizzle', 'drizzle', 'light rain'), newLabel = c('Light Rain'))
+weather_desc$description <- combineLevels(weather_desc$description, 
+                                          levs = c('light intensity drizzle', 'drizzle', 'light rain'), 
+                                          newLabel = c('Light Rain'))
 #moderate and heavy rain, storms
-weather_desc$description <- combineLevels(weather_desc$description, levs = c('moderate rain', 'heavy intensity rain', 'very heavy rain', 'proximity thunderstorm','thunderstorm with light rain','thunderstorm','thunderstorm with heavy rain','thunderstorm with rain', 'heavy intensity drizzle'), newLabel = c('Moderate to Heavy Rain'))
+weather_desc$description <- combineLevels(weather_desc$description, 
+                                          levs = c('moderate rain', 'heavy intensity rain', 'very heavy rain', 'proximity thunderstorm','thunderstorm with light rain','thunderstorm','thunderstorm with heavy rain','thunderstorm with rain', 'heavy intensity drizzle'), 
+                                          newLabel = c('Moderate to Heavy Rain'))
 #snow
-weather_desc$description <- combineLevels(weather_desc$description, levs = c('light snow', 'snow', 'heavy snow'), newLabel = c('Snow'))
+weather_desc$description <- combineLevels(weather_desc$description, 
+                                          levs = c('light snow', 'snow', 'heavy snow'), 
+                                          newLabel = c('Snow'))
 #fog, smoke, etc
-weather_desc$description <- combineLevels(weather_desc$description, levs = c('mist', 'fog', 'smoke', 'haze'), newLabel= c('Fog/Haze/Smoke'))
+weather_desc$description <- combineLevels(weather_desc$description, 
+                                          levs = c('mist', 'fog', 'smoke', 'haze'), 
+                                          newLabel= c('Fog/Haze/Smoke'))
 #detach rockchalk because it messes w/ the dplyr summarize function
 detach("package:rockchalk", unload=TRUE)
 
 
 #determines the average temperature for each day
-avg_daily_temp <- temperature %>% group_by(temperature$Date) %>% summarize(mean_daily_temp = mean(deg_fahrenheit))
+avg_daily_temp <- temperature %>% 
+                    group_by(temperature$Date) %>% 
+                    summarize(mean_daily_temp = mean(deg_fahrenheit))
 colnames(avg_daily_temp) <- c('day', 'temp_f')
-#daily pattern of ridership. uses the daily_rides df to determine the number of days
-daily_pattern <- trips_2015 %>% group_by(trips_2015$time) %>% summarize(n()/(nrow(daily_trips)))
-colnames(daily_pattern) <- c('hour', 'mean_ridership')
 
+#determine the sd of hourly ridership for each hour of the day over the study period
+hourly_trips$time <- hour(hourly_trips$Hour)
+hourly_sd <- hourly_trips %>% 
+              group_by(hourly_trips$time) %>% 
+              summarize(stdev = sd(trips_taken))
+
+#daily pattern of ridership. uses the daily_rides df to determine the number of days
+daily_pattern <- trips_2015 %>% 
+                  group_by(trips_2015$time) %>% 
+                  summarize(mean_ridership = n()/(nrow(daily_trips)))
+colnames(daily_pattern) <- c('hour', 'mean_ridership')
+View(daily_pattern)
 
 #join trips by hour to windspeed by hour based on time of observation
 wind_vs_trips <- inner_join(hourly_trips, windSpeed, by = c('Hour' = 'Date'))
 #join trips by day to temperature by day
 temp_vs_trips <- inner_join(daily_trips, avg_daily_temp, by = c('day' = 'day'))
+#i use this col to facet by month
+temp_vs_trips$month <- months(temp_vs_trips$day)
+temp_vs_trips$month <- factor(temp_vs_trips$month, c('January', 'February',
+                                                     'March', 'April',
+                                                     'May', 'June', 'July'))
+#theres a random july trip hanging around here
+temp_vs_trips <- temp_vs_trips %>% filter(month(day) < 7)
 #join hourly trips to weather description
 desc_vs_trips <- inner_join(hourly_trips, weather_desc, by = c('Hour' = 'Date'))
 
 
 #average the number of hourly trips given a certain weather condition
-weather_trips <- desc_vs_trips %>% group_by(desc_vs_trips$description) %>% summarise(trips = mean(trips_taken), stdev = sd(trips_taken))
+weather_trips <- desc_vs_trips %>% 
+                  group_by(desc_vs_trips$description) %>% 
+                  summarise(trips = mean(trips_taken), 
+                            stdev = sd(trips_taken))
 colnames(weather_trips) <- c('desc', 'trips', 'stdev')
 
 
@@ -125,9 +156,52 @@ summary(lin_reg_temp)
 
 
 #plotting correlations between ridership and windspeed, temperature
-wind_corr <- ggplot(data = wind_vs_trips, aes(x = wind_vs_trips$wind_speed_mph, y = wind_vs_trips$trips_taken)) + geom_point(color = 'blue') + labs(x = 'Hourly Wind Speed', y = 'Trips taken in an hour', title = 'Jan. - Jun. 2015 Citibike Trips Compared to Wind Speed') + stat_smooth(method = "lm", col = 'black')
+wind_corr <- ggplot(data = wind_vs_trips, 
+                    aes(x = wind_vs_trips$wind_speed_mph, 
+                        y = wind_vs_trips$trips_taken)) + 
+            geom_point(color = 'blue') + 
+            labs(x = 'Hourly Wind Speed', 
+                 y = 'Trips taken in an hour', 
+                 title = 'Jan. - Jun. 2015 Citibike Trips Compared to Wind Speed') + 
+            stat_smooth(method = "lm", col = 'black')
 
-temp_corr <- ggplot(data = temp_vs_trips, aes(x = temp_vs_trips$temp_f, y = temp_vs_trips$trips_taken)) + geom_point(color = 'blue') + labs(x = 'Mean daily temperature, degrees Fahrenheit', y = 'Trips taken in a day', title = 'Jan. - Jun. 2015 Citibike Daily Ridership Compared to Temperature') + stat_smooth(method = "lm", col = 'black') + annotate("text", x = 60, y = 10000, label = "y = 473x - 2319, R2 = 0.75")
+
+wind_vs_trips$wind_speed_mph <- as.factor(wind_vs_trips$wind_speed_mph)
+
+wind_box <- ggplot(data = wind_vs_trips, 
+                   aes(x = wind_vs_trips$wind_speed_mph, 
+                       y = wind_vs_trips$trips_taken)) + 
+            geom_boxplot(width = 0.5, 
+               fill = 'steelblue', 
+               outlier.color = 'navyblue', 
+               notch = FALSE, 
+               position = 'dodge') +
+            labs(x = 'Hourly Wind Speed, mph', 
+               y = 'Trips taken in an hour', 
+               title = 'Jan. - Jun. 2015 Citibike Trips Compared to Wind Speed')
+
+
+temp_corr <- ggplot(data = temp_vs_trips, 
+                    aes(x = temp_vs_trips$temp_f, 
+                        y = temp_vs_trips$trips_taken)) + 
+                    geom_point(color = 'blue') + 
+                    labs(x = 'Mean daily temperature, degrees Fahrenheit', 
+                         y = 'Trips taken in a day', 
+                         title = 'Jan. - Jun. 2015 Citibike Daily Ridership Compared to Temperature') + 
+                    stat_smooth(method = "lm", 
+                                col = 'black') + 
+                    annotate("text", x = 60, y = 10000, 
+                             label = "y = 473x - 2319, R2 = 0.75")
+
+temp_corr_facet <- ggplot(data = temp_vs_trips, 
+                    aes(x = temp_vs_trips$temp_f, 
+                        y = temp_vs_trips$trips_taken)) + 
+                    geom_point(color = 'blue') + 
+                    labs(x = 'Mean daily temperature, degrees Fahrenheit', 
+                         y = 'Trips taken in a day', 
+                         title = 'Jan. - Jun. 2015 Citibike Daily Ridership Compared to Temperature') + 
+                    stat_smooth(method = "lm", col = 'black') + 
+                    facet_wrap(~month)
 
 #plot bar graph of weather conditions, hourly ridership
 weather_boxplot <- ggplot(data = desc_vs_trips, aes(x = description, y = trips_taken))+ 
@@ -139,6 +213,7 @@ weather_boxplot <- ggplot(data = desc_vs_trips, aes(x = description, y = trips_t
                   labs(x = 'Weather conditions in a given hour', 
                        y = 'Average number of hourly trips taken', 
                        title = 'Jan. - Jun. 2015 Citibike Average Hourly Ridership in Different Weather Conditions')
+
 
 weather_barplot <- ggplot(data = 
                             weather_trips, 
@@ -181,8 +256,12 @@ hist_hourly
 setwd("C:/Users/Devin Simmons/Desktop/classes/HONR238V/figures/")
 #save plot
 ggsave(filename="temp_and_bike_ridership.png", plot=temp_corr)
+ggsave(filename="temp_and_bike_ridership_monthly.png", plot=temp_corr_facet)
 ggsave(filename = 'weather_conditions_ridership.png', plot = weather_barplot)
 ggsave(filename = 'weather_conditions_box.png', plot = weather_boxplot)
-ggsave(filename = 'wind_ridership.png', plot = wind_corr)
+ggsave(filename = 'wind_ridership_corr.png', plot = wind_corr)
+ggsave(filename = 'wind_ridership_box.png', plot = wind_box)
+wind_box
 ggsave(filename = 'daily_ridership.png', plot = hist_daily)
 ggsave(filename = 'hourly_ridership.png', plot = hist_hourly)
+ggsave(filename = 'daily_ridership_pattern.png', plot = daily_ridership_pattern)
