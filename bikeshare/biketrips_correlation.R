@@ -2,6 +2,7 @@ library(dplyr)
 library(tidyr)
 library(ggplot2)
 library(lubridate)
+library(RColorBrewer)
 
 setwd("C:/Users/Devin Simmons/Desktop/classes/HONR238V/data/")
 
@@ -117,7 +118,10 @@ colnames(avg_daily_temp) <- c('day', 'temp_f')
 hourly_trips$time <- hour(hourly_trips$Hour)
 hourly_sd <- hourly_trips %>% 
               group_by(hourly_trips$time) %>% 
-              summarize(stdev = sd(trips_taken))
+              summarize(stdev = sd(trips_taken), n = n())
+
+#equation to determine the 95% CI
+hourly_sd$error <- qnorm(0.975)*hourly_sd$stdev/sqrt(hourly_sd$n)
 
 #daily pattern of ridership. uses the daily_rides df to determine the number of days
 daily_pattern <- trips_2015 %>% 
@@ -180,18 +184,27 @@ wind_box <- ggplot(data = wind_vs_trips,
                y = 'Trips taken in an hour', 
                title = 'Jan. - Jun. 2015 Citibike Trips Compared to Wind Speed')
 
+temp_vs_trips.lm = lm(trips_taken ~ temp_f, data = temp_vs_trips)
+summary(temp_vs_trips.lm)$r.squared
+summary(temp_vs_trips.lm)$residuals
 
 temp_corr <- ggplot(data = temp_vs_trips, 
                     aes(x = temp_vs_trips$temp_f, 
-                        y = temp_vs_trips$trips_taken)) + 
-                    geom_point(color = 'blue') + 
+                        y = temp_vs_trips$trips_taken), color = month) + 
+                    geom_point(aes(fill = month), size = 3, 
+                               pch=21, color = 'black') + 
                     labs(x = 'Mean daily temperature, degrees Fahrenheit', 
                          y = 'Trips taken in a day', 
                          title = 'Jan. - Jun. 2015 Citibike Daily Ridership Compared to Temperature') + 
                     stat_smooth(method = "lm", 
                                 col = 'black') + 
-                    annotate("text", x = 60, y = 10000, 
-                             label = "y = 473x - 2319, R2 = 0.75")
+                    annotate("text", x = 60, y = 5000, 
+                             label = "y = 473x - 2319, R2 = 0.75") +
+                    scale_color_manual(values=c("#f6eff7", '#d0d1e6',
+                                                "#a6bddb", '#67a9cf',
+                                                "#1c9099", '#016c59')) +
+                    theme_bw()
+temp_corr
 
 temp_corr_facet <- ggplot(data = temp_vs_trips, 
                     aes(x = temp_vs_trips$temp_f, 
@@ -228,13 +241,12 @@ weather_barplot <- ggplot(data =
 
 daily_ridership_pattern <- ggplot(data = daily_pattern, aes(x = hour, 
                                                             y = mean_ridership)) +
-                            geom_line(linetype = 'solid',
-                                     col = 'springgreen3') +
+                            geom_area(fill = 'springgreen3') +
                             geom_point(col = 'springgreen4') +
                             labs(x = 'Hour of the day',
                                  y = 'Mean Ridership',
                                  title = 'Citibike Daily Ridership Pattern')
-
+daily_ridership_pattern
 #histograms showing the distribution of daily, hourly ridership
 hist_daily <- ggplot(data = temp_vs_trips, aes(temp_vs_trips$trips_taken)) + geom_histogram(col = 'white',
                                                                               fill = 'slateblue4',
