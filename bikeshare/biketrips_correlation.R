@@ -120,13 +120,18 @@ hourly_sd <- hourly_trips %>%
               group_by(hourly_trips$time) %>% 
               summarize(stdev = sd(trips_taken), n = n())
 
-#equation to determine the 95% CI
+#equation to determine the error on the hourly averages
 hourly_sd$error <- qnorm(0.975)*hourly_sd$stdev/sqrt(hourly_sd$n)
+
 
 #daily pattern of ridership. uses the daily_rides df to determine the number of days
 daily_pattern <- trips_2015 %>% 
                   group_by(trips_2015$time) %>% 
                   summarize(mean_ridership = n()/(nrow(daily_trips)))
+
+#perform join so that error and averages are accessible in the same table
+daily_pattern <- inner_join(daily_pattern, hourly_sd, by = c('hour' = 'hourly_trips$time'))
+
 colnames(daily_pattern) <- c('hour', 'mean_ridership')
 View(daily_pattern)
 
@@ -245,7 +250,10 @@ daily_ridership_pattern <- ggplot(data = daily_pattern, aes(x = hour,
                             geom_point(col = 'springgreen4') +
                             labs(x = 'Hour of the day',
                                  y = 'Mean Ridership',
-                                 title = 'Citibike Daily Ridership Pattern')
+                                 title = 'Citibike Daily Ridership Pattern') + 
+                            geom_errorbar(data = daily_pattern, aes(x = hour, 
+                                                                    ymax = mean_ridership + error,
+                                                                    ymin = mean_ridership - error))
 daily_ridership_pattern
 #histograms showing the distribution of daily, hourly ridership
 hist_daily <- ggplot(data = temp_vs_trips, aes(temp_vs_trips$trips_taken)) + geom_histogram(col = 'white',
