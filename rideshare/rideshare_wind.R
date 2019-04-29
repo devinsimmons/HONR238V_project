@@ -32,5 +32,9 @@ colnames(hourly_rides) <- c('hour', 'rides')
 wind_vs_rides <- inner_join(hourly_rides, windSpeed_NYC, by = c('hour' = 'datetime'))
 wind_vs_rides$wind_mph <- as.factor(wind_vs_rides$wind_mph)
 
-# ggplot(data = wind_vs_rides, aes(x = wind_vs_rides$wind_mph, y = wind_vs_rides$rides)) + geom_point(color = 'blue') + labs(x = 'Hourly Wind Speed', y = 'Trips taken in an hour', title = 'Hourly Uber Rides Compared to Wind Speed') + stat_smooth(method = "lm", col = 'black')
-ggplot(data = wind_vs_rides, aes(x = wind_mph, y = rides)) + geom_boxplot(width = 0.5, fill = 'steelblue', outlier.color = 'navyblue', notch = FALSE, position = 'dodge') + labs(x = 'Hourly Wind Speed (MPH)', y = 'Trips Taken in an Hour', title = 'Hourly Uber Rides Compared to Wind Speed')
+ggplot(data = wind_vs_rides, aes(x = wind_mph, y = rides)) + 
+  geom_boxplot(width = 0.5, fill = 'steelblue', outlier.color = 'navyblue', 
+                 notch = FALSE, position = 'dodge') + 
+  labs(x = 'Hourly Wind Speed (MPH)', 
+       y = 'Trips Taken in an Hour', 
+       title = 'Jan.-June 2015 Uber Hourly Rides Compared to Wind Speed')
