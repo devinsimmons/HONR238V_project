@@ -23,12 +23,23 @@ colnames(hourly_rides) <- c('hour', 'rides')
 
 uber$time <- hour(uber$hour)
 
-daily_pattern <- uber %>% group_by(uber$time) %>% summarize(n()/(nrow(daily_rides)))
-colnames(daily_pattern) <- c('hour', 'mean_ridership')
+hourly_rides$time <- hour(hourly_rides$hour)
+hourly_sd <- hourly_rides %>% 
+  group_by(time) %>% 
+  summarize(stdev = sd(rides), n = n())
+hourly_sd$error <- qnorm(0.975)*hourly_sd$stdev/sqrt(hourly_sd$n)
+
+daily_pattern <- uber %>% group_by(time) %>% summarize(rides=n()/(nrow(daily_rides)))
+daily_pattern <- inner_join(daily_pattern, hourly_sd, by = c('time' = 'time'))
+colnames(daily_pattern) <- c('hour', 'mean_ridership','std','n','error')
 
 ggplot(data = daily_pattern, aes(x = hour, y = mean_ridership)) + 
-  geom_area(linetype = 'solid', fill = 'springgreen3') + 
+  geom_line(linetype = 'solid', col = 'springgreen3') + 
   geom_point(col = 'springgreen4') + 
   labs(x = 'Hour of the Day', 
        y = 'Mean Ridership', 
-       title = 'Jan.-June 2015 Uber Daily Ridership Pattern by Hour')
+       title = 'Jan.-June 2015 Uber Daily Ridership Pattern by Hour') + 
+  geom_errorbar(data = daily_pattern, aes(x = hour, 
+                                          ymax = mean_ridership + error, 
+                                          ymin = mean_ridership - error),
+                width=0.2)
