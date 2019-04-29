@@ -29,9 +29,30 @@ uber$date <- round_date(uber$datetime, 'day')
 
 daily_rides <- uber %>% group_by(uber$date) %>% summarize(total_daily_rides = n())
 colnames(daily_rides) <- c('day', 'rides')
-
 temp_vs_rides <- inner_join(daily_rides, avg_daily_temp, by = c('day' = 'day'))
+
+
+temp_vs_rides$month <- months(temp_vs_rides$day)
+temp_vs_rides$month <- factor(temp_vs_rides$month, c('January', 'February',
+                                                     'March', 'April',
+                                                     'May', 'June', 'July'))
+temp_vs_rides <- temp_vs_rides %>% filter(month(day) < 6)
+ggplot(data = temp_vs_rides,aes(x = temp_vs_rides$temp_F, y = temp_vs_rides$rides)) + 
+  geom_point(color = 'blue') + 
+  labs(x = 'Mean Daily Temperature (degrees Fahrenheit)', 
+       y = 'Rides Taken in a Day', 
+       title = 'Jan.-June 2015 Uber Daily Ridership versus Mean Daily Temperature') + 
+  stat_smooth(method = "lm", col = 'black') + 
+  facet_wrap(~month)
+
+
 lin_reg_temp <- lm(rides ~ temp_F, data = temp_vs_rides)
 summary(lin_reg_temp)
 
-ggplot(data = temp_vs_rides, aes(x = temp_vs_rides$temp_F, y = temp_vs_rides$rides)) + geom_point(color = 'blue') + labs(x = 'Average Daily Temperature (degrees Fahrenheit)', y = 'Rides Taken in a Day', title = 'Uber Daily Ridership vs. Average Daily Temperature') + stat_smooth(method = "lm", col = 'black') + annotate("text", x = 55, y = 25000, label = "y = 158.28X + 69240.79, R2 = 0.0255")
+# ggplot(data = temp_vs_rides, aes(x = temp_vs_rides$temp_F, y = temp_vs_rides$rides)) + 
+#   geom_point(color = 'blue') + 
+#   labs(x = 'Mean Daily Temperature (degrees Fahrenheit)', 
+#          y = 'Rides Taken in a Day', 
+#          title = 'Jan.-June 2015 Uber Daily Ridership versus Mean Daily Temperature') + 
+#   stat_smooth(method = "lm", col = 'black') + 
+#   annotate("text", x = 55, y = 25000, label = "y = 158.28X + 69240.79, R2 = 0.0255")
