@@ -154,7 +154,12 @@ desc_vs_trips <- inner_join(hourly_trips, weather_desc, by = c('Hour' = 'Date'))
 weather_trips <- desc_vs_trips %>% 
                   group_by(desc_vs_trips$description) %>% 
                   summarise(trips = mean(trips_taken), 
-                            stdev = sd(trips_taken))
+                            stdev = sd(trips_taken), 
+                            n = n())
+colnames(weather_trips) <- c('desc', 'trips','stdev','n')
+#get error for weather desription trips  
+weather_trips$error <- qnorm(0.975)*weather_trips$stdev/sqrt(weather_trips$n)
+
 colnames(weather_trips) <- c('desc', 'trips', 'stdev')
 
 
@@ -239,21 +244,33 @@ weather_barplot <- ggplot(data =
                               y = trips))+ 
                     geom_bar(stat = 'identity',
                              width = 0.5, 
-                             fill = 'steelblue') + 
+                             fill = 'lightseagreen') + 
+                    geom_errorbar(data = weather_trips, size= 1, 
+                                  width = 0.2, col = 'navyblue',
+                                  aes(x = desc,
+                                      ymin = trips - error, 
+                                      ymax = trips + error)) + 
                     labs(x = 'Weather conditions in a given hour', 
-                         y = 'Average number of hourly trips taken', 
+                         y = 'Mean number of hourly trips taken', 
                          title = 'Jan. - Jun. 2015 Citibike Average Hourly Ridership in Different Weather Conditions')
-
+weather_barplot
 daily_ridership_pattern <- ggplot(data = daily_pattern, aes(x = hour, 
                                                             y = mean_ridership)) +
-                            geom_area(fill = 'springgreen3') +
-                            geom_point(col = 'springgreen4') +
                             labs(x = 'Hour of the day',
                                  y = 'Mean Ridership',
-                                 title = 'Citibike Daily Ridership Pattern') + 
-                            geom_errorbar(data = daily_pattern, aes(x = hour, 
-                                                                    ymax = mean_ridership + error,
-                                                                    ymin = mean_ridership - error))
+                                 title = 'Jan. - Jun. 2015 Citibike Daily Ridership Pattern') + 
+                            
+                            geom_line(size = 2,
+                                      col = '#a6d96a') +
+                            geom_errorbar(data = daily_pattern, size= 1, 
+                                          width = 0.3, col = '#2b83ba',
+                                          aes(x = hour, 
+                                              ymax = mean_ridership + error,
+                                              ymin = mean_ridership - error)) + 
+                             
+                            geom_point(col = '#2b83ba',
+                                       size = 2)
+                             
 daily_ridership_pattern
 #histograms showing the distribution of daily, hourly ridership
 hist_daily <- ggplot(data = temp_vs_trips, aes(temp_vs_trips$trips_taken)) + geom_histogram(col = 'white',
