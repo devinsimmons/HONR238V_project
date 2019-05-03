@@ -38,12 +38,20 @@ weatherDescription_NYC$description <- combineLevels(weatherDescription_NYC$descr
 
 detach("package:rockchalk", unload=TRUE)
 
+hourly_rides$time <- hour(hourly_rides$hour)
+
 weather_vs_rides <- inner_join(hourly_rides, weatherDescription_NYC, by = c('hour' = 'datetime'))
-weather_rides <- weather_vs_rides %>% group_by(weather_vs_rides$description) %>% summarise(trips = mean(rides), stdev = sd(rides))
-colnames(weather_rides) <- c('desc', 'rides', 'stdev')
+
+weather_rides <- weather_vs_rides %>% group_by(description) %>% summarise(trips = mean(rides), stdev = sd(rides),n=n())
+colnames(weather_rides) <- c('desc', 'rides', 'stdev','n')
+weather_rides$error <- qnorm(0.975)*weather_rides$stdev/sqrt(weather_rides$n)
 
 ggplot(data = weather_rides, aes(x = desc, y = rides)) + 
   geom_bar(stat = 'identity',width = 0.5,fill = 'steelblue') + 
   labs(x = 'Weather Conditions in a Given Hour', 
        y = 'Mean Number of Hourly Trips Taken', 
-       title = 'Jan.-June 2015 Uber Hourly Ridership in Different Weather Conditions')
+       title = 'Jan.-June 2015 Uber Hourly Ridership in Different Weather Conditions') + 
+  geom_errorbar(data = weather_rides, aes(x = desc, 
+                                          ymax = rides + error, 
+                                          ymin = rides - error),
+                width=0.2)
