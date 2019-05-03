@@ -3,6 +3,12 @@ library(tidyr)
 library(ggplot2)
 library(lubridate)
 library(RColorBrewer)
+library(ggmap)
+library(geojsonio)
+library(sp)
+library(classInt)
+library(sf)
+
 
 setwd("C:/Users/Devin Simmons/Desktop/classes/HONR238V/data/")
 
@@ -32,6 +38,101 @@ trips_2015$hour <- as.POSIXct(trips_2015$hour)
 #extract just the hour, which is stored as an integer
 trips_2015$time_of_day <- hour(trips_2015$hour)
 
+#need to do this because the locational data is inconsistent for some stations
+station_loc <- trips_2015 %>% group_by(trips_2015$end.station.latitude,
+                                       trips_2015$end.station.longitude,
+                                       trips_2015$end.station.id) %>% summarize(n())
+names(station_loc) <- c('lat', 'lon', 'id', 'n')
+station_loc$n <- NULL
+
+#it removes duplicate stations that are listed at multiple locations
+station_loc <- station_loc[match(unique(station_loc$id), 
+                                 station_loc$id),]
+
+#group trips by departure station 
+departures <- trips_2015 %>% group_by(trips_2015$start.station.id,
+                                      trips_2015$start.station.name) %>% summarize('departures' = n())
+names(departures) <- c('id', 'name', 'departures')
+
+#join departures to station locations
+departures <- inner_join(station_loc, departures, 
+                         by = c('id' = 'id'))
+
+names(departures) <- c('lat', 'lon', 'station_id', 
+                       'station_name', 'departures')
+
+#group trips by arrival station 
+arrivals <- trips_2015 %>% group_by(trips_2015$end.station.id,
+                                      trips_2015$end.station.name) %>% summarize('arrivals' = n())
+names(arrivals) <- c('id', 'name', 'arrivals')
+
+#join arrivals to station locations
+arrivals <- inner_join(station_loc, arrivals, 
+                         by = c('id' = 'id'))
+
+names(arrivals) <- c('lat', 'lon', 'station_id', 
+                       'station_name', 'arrivals')
+
+#join departures and arrivals to determine differential 
+ride_differential <- arrivals %>% inner_join(select(departures, 
+                                                   departures, 
+                                                   station_id), 
+                                            by = c('station_id' = 'station_id'))
+
+#calculates net arrivals
+ride_differential$net_arrivals <- ride_differential$arrivals - ride_differential$departures
+ride_differential$arr_minus_dep <- ride_differential$rides.x - ride_differential$rides.y
+
+#spatial dataframe for net arrivals
+net_arrivals_xy <- ride_differential[,c(2, 1)]
+net_arrivals_sp <- SpatialPointsDataFrame(coords = net_arrivals_xy, data = ride_differential,
+                                      proj4string = CRS("+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0"))
+
+
+#read in geoJSON of NYC borough boundaries
+nyc_boundary <- geojson_read('nyc_boundary.json', what ='sp')
+
+#add nyc_boundary as a basemap for the rides
+nyc.layer <- list("sp.polygons", nyc_boundary, col = 'transparent')
+
+
+#color pallette for net_arrival map
+my.palette <- brewer.pal(n = 11, name = "RdBu")
+
+#making my custom own breaks
+breaks <- classIntervals(ride_differential$net_arrivals,
+                         n= 6, style = 'fixed', fixedBreaks = c(-8200, -1000, -250, 0, 500, 1000, 5500))
+
+
+#mapping arrivals and departures by station
+departures_map <- spplot(net_arrivals_sp,zcol = 'departures', sp.layout = nyc.layer, col = 'transparent', 
+       colorkey = TRUE, main = 'Citibike Station Departures,\n Jan. - Jun 2015')
+
+#save figure
+setwd("C:/Users/Devin Simmons/Desktop/classes/HONR238V/figures/")
+png(filename="departures_map.png", height = 3000, width = 5000, res = 450)
+plot(departures_map)
+dev.off()
+departures_map
+
+#mapping arrivals and departures by station
+arrivals_map <- spplot(net_arrivals_sp,zcol = 'arrivals', sp.layout = nyc.layer, col = 'transparent', 
+                         colorkey = TRUE, main = 'Citibike Station Arrivals,\n Jan. - Jun 2015')
+arrivals_map
+png(filename="arrivals_map.png",height = 3000, width = 5000, res = 450)
+plot(arrivals_map)
+dev.off()
+#mapping net_arrivals by station
+net_arrivals_map <- spplot(net_arrivals_sp,zcol = 'net_arrivals', 
+                           sp.layout = nyc.layer, col = 'transparent', 
+                          colorkey = TRUE, col.regions = my.palette,
+                          cuts = c(-8200, -1000, -250, 0, 500, 1000, 5500),
+                           main = 'Citibike Station Net\nArrivals, Jan. - Jun 2015',
+                          par.settings = list(panel.background=list(col="#D3D3D3")))
+net_arrivals_map
+png(filename="net_arrivals_map.png", height = 3000, width = 5000, res = 450)
+plot(net_arrivals_map)
+dev.off()
 
 #group trips by hour so it can be compared with hourly weather measurements
 hourly_trips <- trips_2015 %>% group_by(trips_2015$hour) %>% summarize(n())
@@ -105,7 +206,7 @@ weather_desc$description <- combineLevels(weather_desc$description,
                                           levs = c('mist', 'fog', 'smoke', 'haze'), 
                                           newLabel= c('Fog/Haze/Smoke'))
 #detach rockchalk because it messes w/ the dplyr summarize function
-detach("package:rockchalk", unload=TRUE)
+detach("package:classInt", unload=TRUE)
 
 
 #determines the average temperature for each day
@@ -128,11 +229,12 @@ hourly_sd$error <- qnorm(0.975)*hourly_sd$stdev/sqrt(hourly_sd$n)
 daily_pattern <- trips_2015 %>% 
                   group_by(trips_2015$time) %>% 
                   summarize(mean_ridership = n()/(nrow(daily_trips)))
+colnames(daily_pattern) <- c('hour', 'mean_ridership')
 
 #perform join so that error and averages are accessible in the same table
 daily_pattern <- inner_join(daily_pattern, hourly_sd, by = c('hour' = 'hourly_trips$time'))
 
-colnames(daily_pattern) <- c('hour', 'mean_ridership')
+
 View(daily_pattern)
 
 #join trips by hour to windspeed by hour based on time of observation
@@ -160,7 +262,7 @@ colnames(weather_trips) <- c('desc', 'trips','stdev','n')
 #get error for weather desription trips  
 weather_trips$error <- qnorm(0.975)*weather_trips$stdev/sqrt(weather_trips$n)
 
-colnames(weather_trips) <- c('desc', 'trips', 'stdev')
+colnames(weather_trips) <- c('desc', 'trips', 'stdev', 'n', 'error')
 
 
 #linear regression statistics for temp vs trips
