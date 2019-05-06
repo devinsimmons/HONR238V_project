@@ -7,7 +7,8 @@ library(ggmap)
 library(geojsonio)
 library(sp)
 library(classInt)
-library(sf)
+
+
 
 
 setwd("C:/Users/Devin Simmons/Desktop/classes/HONR238V/data/")
@@ -88,12 +89,11 @@ net_arrivals_xy <- ride_differential[,c(2, 1)]
 net_arrivals_sp <- SpatialPointsDataFrame(coords = net_arrivals_xy, data = ride_differential,
                                       proj4string = CRS("+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0"))
 
-
 #read in geoJSON of NYC borough boundaries
 nyc_boundary <- geojson_read('nyc_boundary.json', what ='sp')
 
 #add nyc_boundary as a basemap for the rides
-nyc.layer <- list("sp.polygons", nyc_boundary, col = 'transparent')
+nyc.layer <- list("sp.polygons", nyc_boundary, col = 'transparent', fill = '#D3D3D3')
 
 
 #color pallette for net_arrival map
@@ -101,12 +101,12 @@ my.palette <- brewer.pal(n = 11, name = "RdBu")
 
 #making my custom own breaks
 breaks <- classIntervals(ride_differential$net_arrivals,
-                         n= 6, style = 'fixed', fixedBreaks = c(-8200, -1000, -250, 0, 500, 1000, 5500))
+                         n= 8, style = 'fixed', fixedBreaks = c(-8200, -2000, -500, 0, 500, 2000, 5500))
 
 
 #mapping arrivals and departures by station
 departures_map <- spplot(net_arrivals_sp,zcol = 'departures', sp.layout = nyc.layer, col = 'transparent', 
-       colorkey = TRUE, main = 'Citibike Station Departures,\n Jan. - Jun 2015')
+       colorkey = TRUE, main = 'Citibike Station Departures,\n Jan. - Jun. 2015')
 
 #save figure
 setwd("C:/Users/Devin Simmons/Desktop/classes/HONR238V/figures/")
@@ -117,23 +117,32 @@ departures_map
 
 #mapping arrivals and departures by station
 arrivals_map <- spplot(net_arrivals_sp,zcol = 'arrivals', sp.layout = nyc.layer, col = 'transparent', 
-                         colorkey = TRUE, main = 'Citibike Station Arrivals,\n Jan. - Jun 2015')
+                         colorkey = TRUE, main = 'Citibike Station Arrivals,\n Jan. - Jun. 2015')
 arrivals_map
 png(filename="arrivals_map.png",height = 3000, width = 5000, res = 450)
 plot(arrivals_map)
 dev.off()
+
+#change shade of NYC layer
+#add nyc_boundary as a basemap for the rides
+nyc.layer <- list("sp.polygons", nyc_boundary, col = 'transparent', fill = '#A9A9A9')
+
 #mapping net_arrivals by station
 net_arrivals_map <- spplot(net_arrivals_sp,zcol = 'net_arrivals', 
                            sp.layout = nyc.layer, col = 'transparent', 
                           colorkey = TRUE, col.regions = my.palette,
-                          cuts = c(-8200, -1000, -250, 0, 500, 1000, 5500),
-                           main = 'Citibike Station Net\nArrivals, Jan. - Jun 2015',
-                          par.settings = list(panel.background=list(col="#D3D3D3")))
+                          cuts = breaks$brks,
+                           main = 'Citibike Station Net\nArrivals, Jan. - Jun. 2015')
 net_arrivals_map
+
 png(filename="net_arrivals_map.png", height = 3000, width = 5000, res = 450)
 plot(net_arrivals_map)
 dev.off()
 
+
+
+
+setwd("C:/Users/Devin Simmons/Desktop/classes/HONR238V/data/")
 #group trips by hour so it can be compared with hourly weather measurements
 hourly_trips <- trips_2015 %>% group_by(trips_2015$hour) %>% summarize(n())
 #same for days
@@ -205,8 +214,8 @@ weather_desc$description <- combineLevels(weather_desc$description,
 weather_desc$description <- combineLevels(weather_desc$description, 
                                           levs = c('mist', 'fog', 'smoke', 'haze'), 
                                           newLabel= c('Fog/Haze/Smoke'))
-#detach rockchalk because it messes w/ the dplyr summarize function
-detach("package:classInt", unload=TRUE)
+
+detach("package:rockchalk", unload=TRUE)
 
 
 #determines the average temperature for each day
@@ -354,7 +363,7 @@ weather_barplot <- ggplot(data =
                                       ymax = trips + error)) + 
                     labs(x = 'Weather conditions in a given hour', 
                          y = 'Mean number of hourly trips taken', 
-                         title = 'Jan. - Jun. 2015 Citibike Average Hourly Ridership in Different Weather Conditions')
+                         title = 'Jan. - Jun. 2015 Citibike Mean Hourly Ridership in Different Weather Conditions')
 weather_barplot
 daily_ridership_pattern <- ggplot(data = daily_pattern, aes(x = hour, 
                                                             y = mean_ridership)) +
@@ -363,15 +372,15 @@ daily_ridership_pattern <- ggplot(data = daily_pattern, aes(x = hour,
                                  title = 'Jan. - Jun. 2015 Citibike Daily Ridership Pattern') + 
                             
                             geom_line(size = 2,
-                                      col = '#a6d96a') +
+                                      col = 'mediumseagreen') +
                             geom_errorbar(data = daily_pattern, size= 1, 
-                                          width = 0.3, col = '#2b83ba',
+                                          width = 0.3, col = 'mediumblue',
                                           aes(x = hour, 
                                               ymax = mean_ridership + error,
                                               ymin = mean_ridership - error)) + 
                              
-                            geom_point(col = '#2b83ba',
-                                       size = 2)
+                            geom_point(col = 'mediumblue',
+                                       size = 3)
                              
 daily_ridership_pattern
 #histograms showing the distribution of daily, hourly ridership
@@ -400,7 +409,6 @@ ggsave(filename = 'weather_conditions_ridership.png', plot = weather_barplot)
 ggsave(filename = 'weather_conditions_box.png', plot = weather_boxplot)
 ggsave(filename = 'wind_ridership_corr.png', plot = wind_corr)
 ggsave(filename = 'wind_ridership_box.png', plot = wind_box)
-wind_box
 ggsave(filename = 'daily_ridership.png', plot = hist_daily)
 ggsave(filename = 'hourly_ridership.png', plot = hist_hourly)
 ggsave(filename = 'daily_ridership_pattern.png', plot = daily_ridership_pattern)
